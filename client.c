@@ -63,9 +63,8 @@ int main(int argc, char *argv[])
 	error("ERROR writing to socket");
       }
 
-    bzero(buffer,256);
-
     // Get response from server
+    bzero(buffer,256);
     n = read(sockfd,buffer,255);
     if (n < 0) 
     {
@@ -75,11 +74,11 @@ int main(int argc, char *argv[])
 
     if( strncmp(buffer,"Logged out successfully.",24) == 0 )
     {
-      printf( "%s\n", buffer );
+      printf("%s\n", buffer );
       break;
     }
     else
-      printf( "%s\n",buffer );
+      printf("[Server] -  %s\n",buffer );
 
   }
 

@@ -41,6 +41,19 @@ void error(const char *msg)
   exit(1);
 }
 
+// Logs in the user to post tweets
+int authenticate_user( int* s )
+{
+  // Get username 
+
+
+
+  // Get password
+
+
+  // Reponse
+
+}
 int main(int argc, char *argv[])
 {
   // Signal handler 
@@ -72,21 +85,21 @@ int main(int argc, char *argv[])
   listen(sockfd,5);                             // Start listening for clients (max 5)
   clilen = sizeof(cli_addr);
 
+  printf("Successfully binded to hostname/port!\n" );
   pid_t pid = 0;
   for(;;)
   {
     newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-
+    printf("Accepted port!\n");
     // Fork a new process whenever a new client connects
     if ((pid = fork()) == -1)
     {
-      close(newsockfd);
+      //don't go here!
       continue;
     }
     else if(pid > 0) // Parent/Server process
     {
-
-      close(newsockfd);
+      //printf("Parent PID.\n");
       continue;
     }
     else if(pid == 0) // Child/Client process
@@ -97,19 +110,18 @@ int main(int argc, char *argv[])
 
       for( ;; )
       {
+	// Authenticate
+	authenticate_user( &newsockfd );
+
 	// Read from client
 	bzero(buffer,256);
-	
 	n = read(newsockfd,buffer,255);
 	if (n < 0) 
 	  error("ERROR reading from socket");
 
-	int ret = strncmp(buffer,"quit",4);
-	printf("ret for %s is: %i\n", buffer, ret);
-	 
-	if( ret == 0 )
+	if( strncmp(buffer,"quit",4) == 0 )
 	{
-	  printf("Client logged out...");
+	  printf("Status: [Client %i] - Logged out...\n", pid);
 
 	  // Write to client
 	  n = write(newsockfd,"Logged out successfully.",24);
@@ -120,7 +132,7 @@ int main(int argc, char *argv[])
 	  break;
 	}
 	else
-	  printf("Here is the message: %s",buffer);
+	  printf("From [Client %i] - %s\n", pid, buffer);
 
 	// Write to client
 	n = write(newsockfd,"I got your message",18);
