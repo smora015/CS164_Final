@@ -66,8 +66,26 @@ int main(int argc, char *argv[])
 
   for( ;; )
   {
-    // Get message
-    printf("Please enter the message: ");
+    // Get response from server
+    bzero(buffer,256);
+    n = read(sockfd,buffer,255);
+    if (n < 0) 
+    {
+      close(sockfd);
+      error("ERROR reading from socket");
+    }
+
+    // If logged out, confirm message
+    if( strncmp(buffer,"Logged out successfully.",24) == 0 )
+    {
+      printf("%s\n", buffer );
+      break;
+    }
+    else
+      printf("%s",buffer );
+    
+    // Get message from user
+    //printf("message: ");
     bzero(buffer,256);
     fgets(buffer,255,stdin);
 
@@ -79,22 +97,6 @@ int main(int argc, char *argv[])
 	error("ERROR writing to socket");
       }
 
-    // Get response from server
-    bzero(buffer,256);
-    n = read(sockfd,buffer,255);
-    if (n < 0) 
-    {
-      close(sockfd);
-      error("ERROR reading from socket");
-    }
-
-    if( strncmp(buffer,"Logged out successfully.",24) == 0 )
-    {
-      printf("%s\n", buffer );
-      break;
-    }
-    else
-      printf("[Server] -  %s\n",buffer );
 
   }
 
