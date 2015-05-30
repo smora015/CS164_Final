@@ -10,36 +10,8 @@
 #include <signal.h>  // Used for handling SIGINT (ctrl+c)
 #include <pthread.h> // pthread functions & data for parallelism
 
-int sockfd;            // Socket file descriptor
-int newsockfd;         // New socket file descriptor
+#include "server.h"
 
-
-
-void handle_signal( int signal )
-{
-  // Find out which signal we're handling
-  switch (signal) {
-  case SIGHUP:
-    break;
-  case SIGUSR1:
-    break;
-  case SIGINT:
-    printf("Caught SIGINT, exiting now\n");
-    close(sockfd);
-    close(newsockfd);
-    exit(0);
-  default:
-    fprintf(stderr, "Caught wrong signal: %d\n", signal);
-    return;
-  }
-}
-
-// Specifies error messages and ends program
-void error(const char *msg)
-{
-  perror(msg);
-  exit(1);
-}
 
 // Logs in the user to post tweets
 int authenticate_user( int* s )
@@ -145,4 +117,30 @@ int main(int argc, char *argv[])
   close(newsockfd);
   close(sockfd);
   return 0; 
+}
+
+// Specifies error messages and ends program
+void error(const char *msg)
+{
+  perror(msg);
+  exit(1);
+}
+
+void handle_signal( int signal )
+{
+  // Find out which signal we're handling
+  switch (signal) {
+  case SIGHUP:
+    break;
+  case SIGUSR1:
+    break;
+  case SIGINT:
+    printf("Caught SIGINT, exiting now\n");
+    close(sockfd);
+    close(newsockfd);
+    exit(0);
+  default:
+    fprintf(stderr, "Caught wrong signal: %d\n", signal);
+    return;
+  }
 }
