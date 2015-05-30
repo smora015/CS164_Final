@@ -72,44 +72,26 @@ int main(int argc, char *argv[])
       if (newsockfd < 0) 
 	error("ERROR on accept");
 
-      printf("authenticating user...\n");
       // Authenticate the user
       if( is_authenticated( &newsockfd ) == 0 )
 	authenticate_user( &newsockfd );
 
-      printf("done authenticating user...\n");
-      for( ;; ) {
+      current_menu = 0; // 0 = main menu, etc
 
-      // Display menu
-      int current_menu = 0; // 0 = main menu, etc
-      display_menu( &newsockfd, &current_menu );
-	
-      // Get reply from client
-      bzero(buffer,256);
-      n = read(newsockfd,buffer,255);
-      if (n < 0) 
-	error("ERROR reading from socket");
-
-      if( strncmp(buffer,"quit",4) == 0 )
-      {
-	printf("Status: [Client %i] - Logged out...\n", newsockfd);
-
-	// Write to client
-	n = write(newsockfd,"Logged out successfully.",24);
-	if (n < 0)
-	  error("ERROR writing to socket");
-	  
-	close(newsockfd);
-	break;
-      }
-      else
-	printf("From [Client %i] - %s\n", newsockfd, buffer);
-
-      // Write to client
-      n = write(newsockfd,"I got your message",18);
-      if (n < 0) error("ERROR writing to socket");
+      // Loop for handling replies and responses to/from client
+      for( ;; ) 
+      {	
+	if( current_menu != 5 )
+	  // Display menu and handle commands
+	  handle_menu( &newsockfd, &current_menu );
+	else
+	{
+	  close(newsockfd);
+	  break;
+	}
 
       }
+
     }
   }
 
@@ -213,7 +195,6 @@ int authenticate_user( int* sockfd )
     usr = users; // Used to traverse list of users
     found = 0;
 
-    printf("inside authenticate_user...\n");
     // Prompt for username
     n = write(*sockfd, un, strlen(un));
 
@@ -252,13 +233,60 @@ int authenticate_user( int* sockfd )
   n = write(*sockfd, ss, strlen(ss));
 }
 
-void display_menu( int* sockfd, int* menu )
+void handle_menu( int* sockfd, int* menu )
 {
-  char* main_msg = "============================\n Welcome to the CS164 Twitter Clone! \n============================\n";
-  // Write to client
-  int n = write(*sockfd,main_msg,strlen(main_msg));
-  if (n < 0) error("ERROR writing to socket");
-  
+  char buffer[255];
+  // Get reply from client
+  if( *menu == 0 ) // Main Menu
+    {
+    char* main_msg = "============================\n CS164 Twitter Clone - Main Menu \n============================\n\
+1. Offline Messages\n2. Edit Subscriptions\n 3. Post a message\n4. Hashtag search\n5. Logout (or 'quit')";
 
+    // Display main message
+    int n = write(*sockfd,main_msg,strlen(main_msg));
+    if (n < 0) error("ERROR writing to socket");
+
+    n = read( *sockfd, buffer, 255);
+    if( n < 0) error("ERROR reading from socket");
+    
+    *menu = atoi( (const char*) buffer );
+  }  
+  else if( *menu == 1 ) // See Offline Messages
+  {
+
+
+  }
+  else if( *menu == 2 ) // Edit Subscriptions
+  {
+
+  }
+  else if( *menu == 3 ) // Post a message
+  {
+
+  }
+  else if( *menu == 4) // Hashtag search
+  {
+
+  }
+  else if( *menu == 5) // Logout
+  {
+    printf("Status: [Client %i] - Logged out...\n", *sockfd);
+
+    // Write to client
+    int n = write( *sockfd,"Logged out successfully.",24);
+    if (n < 0)
+      error("ERROR writing to socket");
+  }
+  else
+  {
+    char* msg = "Invalid command. Re-enter: ";
+    int n = write( *sockfd, msg, strlen(msg) );
+    if( n < 0 ) error("ERROR writing socket!");
+
+    n = read( *sockfd, buffer, 255 );
+    if( n < 0 ) error("ERROR reading from socket!");
+    *menu = atoi( (const char*) buffer );
+  }
   return;
 }
+

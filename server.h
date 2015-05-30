@@ -8,7 +8,7 @@
 // Declare structs
 typedef struct messages_struct {
   char* from;
-  char* to;
+  char* to; // Only used for private messages
   char* message;
 } message;
 
@@ -26,6 +26,7 @@ int newsockfd;         // New socket file descriptor
 // Server variables
 user* users;           // List of total users
 user* users_online;    // List of currently online users
+int current_menu;      // Corresponds to what menu the user is in
 int messagecount;      // Keeps track of number of messages received
 
 // Error handling functions
@@ -39,13 +40,13 @@ int is_authenticated( int* sockfd );
 int authenticate_user( int* sockfd );
 
 // Interface functions
-void display_menu( int* sockfd, int* menu );
+void handle_menu( int* sockfd, int* menu );
 
 #endif /* __SERVER_H__ */
 
 /*   Server Side:
 
-  1. Validate a user login (3-5 hard coded)
+  1. Validate a user login (3-5 hard coded)   DONE
   2. Maintain a list of user's subscriptions to other users, and allow them to change it
   3. Receive messages and redistribute in real time
   4. Store messages sent (not delivered) if the subscribers were offline.
@@ -54,7 +55,7 @@ void display_menu( int* sockfd, int* menu );
 
 /*    Client Side Specifications:
 
-   1. Prompt the user for their username and password
+   1. Prompt the user for their username and password   DONE
    2. Provide a welcome message that displays number of new messages
    3. Provide a menu for the user to select valid options. Should be a way to navigate back
    4. Menu option: See Offline Messages
