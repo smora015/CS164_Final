@@ -8,8 +8,13 @@ Requires GCC with standard C libraries (tested on GNU/Linux.)
 
 Steps:
 1. git clone https://github.com/smora015/CS164_Final.git
+
 2. gcc server.c -o server
+
 3. gcc client.c -o client
+
 4. ./server
+
 5. ./client
+
 6. Run program off terminal through keyboard input
