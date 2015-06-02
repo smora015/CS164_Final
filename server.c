@@ -2,8 +2,10 @@
 #include <stdlib.h> // Memory allocation, free, etc
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h> // Inter-process shared memory
+#include <sys/mman.h>
+#include <sys/types.h>
 
-#include <sys/types.h> 
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -11,6 +13,7 @@
 #include <pthread.h> // pthread functions & data for parallelism
 
 #include "server.h"
+
 
 
 int main(int argc, char *argv[])
@@ -56,8 +59,10 @@ int main(int argc, char *argv[])
     newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
     printf("Accepted port!\n");
     // Fork a new process whenever a new client connects
-    if ((pid = fork()) == -1)
+    pid = fork();
+    if ( pid < 0 )
     {
+      error("fork()");
       //don't go here!
       continue;
     }
@@ -114,9 +119,9 @@ int main(int argc, char *argv[])
 	  close(newsockfd);
 	  break;
 	}
-
+	
       }
-
+      
     }
   }
 
@@ -195,8 +200,17 @@ user* get_user( char* username )
 void init_data()
 {
   // Allocate enough space in users list for 5 clients
-  users = (user*) malloc( sizeof(user)*MAX_USERS );
-  users_online = (user*) malloc( sizeof(user)*MAX_USERS );
+  //users = (user*) malloc( sizeof(user)*MAX_USERS );
+  //users_online = (user*) malloc( sizeof(user)*MAX_USERS );
+
+  // Allocate user lists and online user list as shared process memory
+  users = mmap(NULL, sizeof * users * MAX_USERS, PROT_READ | PROT_WRITE, 
+       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+  users_online = mmap(NULL, sizeof * users * MAX_USERS, PROT_READ | PROT_WRITE, 
+       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+
   current_user = (user*) malloc( sizeof(*current_user) );
 
 
@@ -268,6 +282,8 @@ int authenticate_user( int* sockfd )
 
 	current_user = (user*) malloc( sizeof(user) );   // Set current user
 	current_user = get_current_user( *sockfd ); 
+	printf("[User %s] - Is now online.\n", current_user->username);
+
       }
       ++usr; // Iterate to next user
     }
@@ -290,7 +306,7 @@ void handle_menu( int* sockfd, int* menu )
   if( *menu == 0 ) // Main Menu
   {
     char* main_msg = "============================\n CS164 Twitter Clone - Main Menu \n============================\n\
-1. Offline Messages\n2. Edit Subscriptions\n3. Post a message\n4. Hashtag search\n5. Logout (or 'quit'): ";
+1. Offline Messages\n2. Edit Subscriptions\n3. Post a message\n4. Hashtag search\n5. Logout (or 'quit')\n> ";
 
     // Display main message
     int n = write(*sockfd,main_msg,strlen(main_msg));
@@ -299,11 +315,11 @@ void handle_menu( int* sockfd, int* menu )
   }  
   else if( *menu == 1 ) // See Offline Messages
   {
-    char* main_msg = "============================\n CS164 Twitter Clone - Offline Messages \n============================\n0. Back";
+    char* main_msg = "============================\n CS164 Twitter Clone - Offline Messages \n============================\n0. Back\n";
 
     if( current_user->messages == NULL )
     {
-      char * msg = "You have don't have any offline messages.\n";
+      char * msg = "You have don't have any offline messages.\n> ";
       strcat( strcat( buffer, main_msg ), msg );
 
       n = write( *sockfd, buffer, strlen(buffer) );
@@ -312,25 +328,34 @@ void handle_menu( int* sockfd, int* menu )
   }
   else if( *menu == 2 ) // Edit Subscriptions
   {
-    
+    char* main_msg = "============================\n CS164 Twitter Clone - Subscriptions \n============================\n0. Back\n1. Subscribe to\n2. Unsubscribe from.\n> ";
+
+    n = write( *sockfd, main_msg, strlen(main_msg) );
+    if( n < 0 ) error("ERROR writing to socket");
+
   }
   else if( *menu == 3 ) // Post a message
   {
+    char* main_msg = "====================\n CS164 Twitter Clone - Post a Message to Subscriptions \n====================\n0. Back\n> ";
+    
+    n = write( *sockfd, main_msg, strlen(main_msg) );
+    if( n < 0 ) error("ERROR writing to socket");
 
   }
   else if( *menu == 4) // Hashtag search
   {
+    char* main_msg = "====================\n CS164 Twitter Clone - Hashtags Trending  \n====================\n0. Back\n";
+    
+    n = write( *sockfd, main_msg, strlen(main_msg) );
+    if( n < 0 ) error("ERROR writing to socket");
 
   }
   else
   {
-    char* msg = "Invalid command. Re-enter: ";
+    char* msg = "";
     int n = write( *sockfd, msg, strlen(msg) );
     if( n < 0 ) error("ERROR writing socket!");
 
-    n = read( *sockfd, buffer, 255 );
-    if( n < 0 ) error("ERROR reading from socket!");
-    *menu = atoi( (const char*) buffer );
   }
   return;
 }
