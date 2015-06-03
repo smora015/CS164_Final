@@ -18,6 +18,7 @@ typedef struct user_struct {
 
   int sockfd;        // The current socket the user is associated to
 
+  char** subs;       // Keeps track of current subscriptions
   message* messages; // Keeps track of sent but not delivered messages
   int message_count; // The number of messages
 } user;
@@ -25,6 +26,9 @@ typedef struct user_struct {
 // Declare socket descriptors
 int sockfd;            // Socket file descriptor
 int newsockfd;         // New socket file descriptor
+
+char buffer[512];      // Buffer to hold messages
+int n = 0;             // Used to read/write from/to socket
 
 // Declare server variables
 user* users;           // List of total users
@@ -38,14 +42,20 @@ void error(const char *msg);
 void handle_signal( int signal );
 
 // Initialization functions
-user create_user( char* username, char* password, int sockfd, message* messages);
+user create_user( char* username, char* password, int sockfd, message* messages, char** subs);
 user* get_current_user( int sockfd );
 user* get_user( char* username );
 void init_data();
 int authenticate_user( int* sockfd );
 
 // Interface functions
-void handle_menu( int* sockfd, int* menu );
+void get_input();
+void handle_menu();
+void handle_offline_messages();
+char* get_available_subscriptions();
+void handle_subscriptions();
+void handle_post_message();
+void handle_hashtags();
 
 #endif /* __SERVER_H__ */
 

@@ -25,8 +25,6 @@ int main(int argc, char *argv[])
   // Set up variables for sockets
   int portno = 7158;     // Port #
   socklen_t clilen;      // Length of cli_addr struct
-  char buffer[256];      // Buffer to hold messages
-  int n = 0;             // Used to read/write from/to socket
       
   struct sockaddr_in serv_addr, cli_addr; // Holds address of servers and clients
 
@@ -91,20 +89,14 @@ int main(int argc, char *argv[])
       
       // Display main menu
       current_menu = 0; // 0 = main menu, etc
-      handle_menu( &newsockfd, &current_menu ); 
+      handle_menu(); 
 
       // Loop for handling replies and responses to/from client
       for( ;; ) 
       {	
-	// Get command from client
-	bzero(buffer,256);
-	n = read( newsockfd, buffer, 255);
-	if( n < 0) error("ERROR reading from socket");
-	current_menu = atoi( (const char*) buffer ); 
-
 	// Handle command
 	if( current_menu != 5 )
-	  handle_menu( &newsockfd, &current_menu );
+	  handle_menu();
 
 	// Log out the user if they entered '5'
 	else
@@ -157,7 +149,7 @@ void handle_signal( int signal )
 }
 
 
-user create_user( char* username, char* password, int sockfd, message* messages)
+user create_user( char* username, char* password, int sockfd, message* messages, char** subs)
 {
   user new_user;
   new_user.username = username;
@@ -165,6 +157,7 @@ user create_user( char* username, char* password, int sockfd, message* messages)
   new_user.sockfd = sockfd;
   new_user.messages = messages;
   new_user.message_count = 0;
+  new_user.subs = subs;
 
   return new_user;
 }
@@ -188,7 +181,7 @@ user* get_user( char* username )
   user* usr = users;
   while( usr != NULL )
   {
-    if( strncmp( usr->username, username, strlen(username)) )
+    if( strncmp( usr->username, username, strlen(username)) == 0 )
 	return usr;
 
     ++usr; // Iterate to next user!
@@ -215,9 +208,9 @@ void init_data()
 
 
   // Hard code 3 users
-  user tom = create_user( "tom", "tom_password", -1, NULL);
-  user chris = create_user( "chris", "chris_password", -1, NULL);
-  user sara  = create_user( "sara", "sara_password", -1, NULL);
+  user tom = create_user( "tom", "tom_password", -1, NULL, NULL);
+  user chris = create_user( "chris", "chris_password", -1, NULL, NULL);
+  user sara  = create_user( "sara", "sara_password", -1, NULL, NULL);
 
   users[0] = tom;
   users[1] = chris;
@@ -297,66 +290,239 @@ int authenticate_user( int* sockfd )
   n = write(*sockfd, ss, strlen(ss));
 }
 
-void handle_menu( int* sockfd, int* menu )
+void get_input()
+{
+  // Get command from client
+  bzero(buffer,512);
+  n = read( newsockfd, buffer, 512);
+  if( n < 0) error("ERROR reading from socket");
+}
+
+void get_menu_input()
+{
+  // Get command from client
+  bzero(buffer,512);
+  n = read( newsockfd, buffer, 512);
+  if( n < 0) error("ERROR reading from socket");
+
+  if( strlen(buffer) == 0 )
+    current_menu = 0;
+  else
+    {
+      current_menu = atoi( (const char*) buffer ); 
+      //printf("Received: %d\n", current_menu);
+    }
+
+}
+void handle_menu()
 {
   int n;
-  char buffer[255];
 
   // Get reply from client
-  if( *menu == 0 ) // Main Menu
+  if( current_menu == 0 ) // Main Menu
   {
     char* main_msg = "============================\n CS164 Twitter Clone - Main Menu \n============================\n\
 1. Offline Messages\n2. Edit Subscriptions\n3. Post a message\n4. Hashtag search\n5. Logout (or 'quit')\n> ";
 
     // Display main message
-    int n = write(*sockfd,main_msg,strlen(main_msg));
+    int n = write( newsockfd,main_msg,strlen(main_msg));
     if (n < 0) error("ERROR writing to socket");
 
+    // Read input from socket
+    get_menu_input();
+
   }  
-  else if( *menu == 1 ) // See Offline Messages
+  else if( current_menu == 1 ) // See Offline Messages
   {
-    char* main_msg = "============================\n CS164 Twitter Clone - Offline Messages \n============================\n0. Back\n";
-
-    if( current_user->messages == NULL )
-    {
-      char * msg = "You have don't have any offline messages.\n> ";
-      strcat( strcat( buffer, main_msg ), msg );
-
-      n = write( *sockfd, buffer, strlen(buffer) );
-      if( n < 0 ) error("ERROR writing to socket");
-    }    
+    handle_offline_messages();
   }
-  else if( *menu == 2 ) // Edit Subscriptions
+  else if( current_menu == 2 ) // Edit Subscriptions
   {
-    char* main_msg = "============================\n CS164 Twitter Clone - Subscriptions \n============================\n0. Back\n1. Subscribe to\n2. Unsubscribe from.\n> ";
-
-    n = write( *sockfd, main_msg, strlen(main_msg) );
-    if( n < 0 ) error("ERROR writing to socket");
-
+    handle_subscriptions();
   }
-  else if( *menu == 3 ) // Post a message
+  else if( current_menu == 3 ) // Post a message
   {
-    char* main_msg = "====================\n CS164 Twitter Clone - Post a Message to Subscriptions \n====================\n0. Back\n> ";
-    
-    n = write( *sockfd, main_msg, strlen(main_msg) );
-    if( n < 0 ) error("ERROR writing to socket");
-
+    handle_post_message();
   }
-  else if( *menu == 4) // Hashtag search
+  else if( current_menu == 4) // Hashtag search
   {
-    char* main_msg = "====================\n CS164 Twitter Clone - Hashtags Trending  \n====================\n0. Back\n";
-    
-    n = write( *sockfd, main_msg, strlen(main_msg) );
-    if( n < 0 ) error("ERROR writing to socket");
-
+    handle_hashtags();
   }
-  else
+  else // Invalid input
   {
-    char* msg = "";
-    int n = write( *sockfd, msg, strlen(msg) );
+    char* msg = "\n>";
+    int n = write( newsockfd, msg, strlen(msg) );
     if( n < 0 ) error("ERROR writing socket!");
+
+    // Read input from socket
+    get_menu_input();
 
   }
   return;
 }
 
+
+void handle_offline_messages()
+{
+  char* main_msg = "============================\n CS164 Twitter Clone - Offline Messages \n============================\n0. Back\n";
+  while( current_menu != 0 )
+  {
+    if( current_user->messages == NULL )
+    {
+      char * msg = "You have don't have any offline messages.\n> ";
+      bzero(buffer,512);
+      strcat( strcat( buffer, main_msg ), msg );
+      
+      n = write( newsockfd, buffer, strlen(buffer) );
+      if( n < 0 ) error("ERROR writing to socket");
+    }
+    else
+    {
+      char * msg = "You HAVE offline messages. Displaying...\n> ";
+      bzero(buffer,512);
+      strcat( strcat( buffer, main_msg ), msg );
+      
+      n = write( newsockfd, buffer, strlen(buffer) );
+      if( n < 0 ) error("ERROR writing to socket");
+    }
+    
+    // Read input from socket
+    get_menu_input();
+    
+  }
+  
+}
+
+
+char* get_available_subscriptions()
+{
+  bzero(buffer, 512); // Store all available subs in buffer
+  user* usr = users;  // Pointer to users
+  char** sub;         // Pointer to subscriptions
+  int already_subbed; // Flag to check if already subscribed
+
+  while( usr->username != NULL )
+  {
+    printf("...in users loop...with current user %s \n", usr->username);
+
+   // Iterate through each user, and checking if its not in current subscriptions
+    sub = current_user->subs;
+    already_subbed = 0;
+    while( sub != NULL && (strncmp(usr->username, current_user->username, strlen(usr->username)) != 0) )
+    {
+      printf("...in subs loop...comparing %s to %s \n", usr->username, *sub);
+      // Only check for those who are not already subscribed
+      if( strncmp( *sub, usr->username, strlen(usr->username)) == 0)
+	already_subbed = 1;
+
+      ++sub; // Iterate to next sub
+    }
+
+    if( !already_subbed )
+    {
+      strcat( strcat( strcat( buffer, "~~> "), usr->username), ",\n");
+    }
+
+    ++usr; // Iterate to next user
+  }
+
+  return buffer;
+}
+
+void handle_subscriptions()
+{
+  char* main_msg = "============================\n CS164 Twitter Clone - Subscriptions \n============================\n0. Back\n1. Subscribe to\n2. Unsubscribe from.\n> ";
+  
+  while( current_menu != 0 )
+  {
+    n = write( newsockfd, main_msg, strlen(main_msg) );
+    if( n < 0 ) error("ERROR writing to socket");
+    
+    // Read input from socket
+    get_menu_input();
+    
+
+    if( current_menu == 1 || current_menu == 2  ) // Subscribe or unsubscribe
+    {
+
+      printf("Inside subscribe or unsubscribe\n");
+      // Subscribe
+      if( current_menu == 1)
+      {
+	printf("Before get_available_subscriptions()\n");
+	char* msg = "You may subscribe to the following: \n";
+	char* msg2 = get_available_subscriptions();
+	char* msg3 = "\nEnter the username of who you wish to subscribe to, or 0 to cancel:\n> ";
+
+	printf("After get_available_subscriptions()...got %s\n", msg2);
+
+	bzero(buffer, 512);
+	//strcat( strcat( strcat( buffer, msg ), msg2 ), msg3 );
+	strcat(buffer, msg);
+	
+	printf("after strcat...\n");
+	n = write( newsockfd, buffer, strlen(buffer) );
+	if( n < 0 ) error( "ERROR writing to socket");
+
+	printf("after writing total subscriptions to user...\n");
+
+	// Get input and place into buffer
+	get_input();
+
+	// Subscribe to selected user entered in buffer
+	//subscribe_to();
+
+      }
+      else if( current_menu == 2)
+      {
+	const char* msg = "You may unsubscribed from your current subs listed below: \n";
+	
+	bzero(buffer, 512);
+	strcat( buffer, msg );
+	n = write( newsockfd, buffer, strlen(buffer) );
+	if( n < 0 ) error( "ERROR writing to socket");
+	
+	// Get input
+	get_input();
+      }
+      
+      
+    }
+  }
+}
+
+
+void handle_post_message()
+{
+  char* main_msg = "====================\n CS164 Twitter Clone - Post a Message to Subscriptions \n====================\n0. Back\n> ";
+  
+  while( current_menu != 0 )
+  {
+    
+    n = write( newsockfd, main_msg, strlen(main_msg) );
+    if( n < 0 ) error("ERROR writing to socket");
+    
+    
+    // Read input from socket
+    get_menu_input();
+    
+  }
+  
+}
+
+
+void handle_hashtags()
+{
+  char* main_msg = "====================\n CS164 Twitter Clone - Hashtags Trending  \n====================\n0. Back\n";
+  
+  while( current_menu != 0 )
+  {
+    
+    n = write( newsockfd, main_msg, strlen(main_msg) );
+    if( n < 0 ) error("ERROR writing to socket");
+    
+    // Read input from socket
+    get_menu_input();
+  }
+  
+}
