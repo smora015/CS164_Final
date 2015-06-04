@@ -403,14 +403,11 @@ char* get_available_subscriptions()
 
   while( usr->username != NULL )
   {
-    printf("...in users loop...with current user %s \n", usr->username);
-
-   // Iterate through each user, and checking if its not in current subscriptions
+    // Iterate through each user, and checking if its not in current subscriptions
     sub = current_user->subs;
     already_subbed = 0;
     while( sub != NULL && (strncmp(usr->username, current_user->username, strlen(usr->username)) != 0) )
     {
-      printf("...in subs loop...comparing %s to %s \n", usr->username, *sub);
       // Only check for those who are not already subscribed
       if( strncmp( *sub, usr->username, strlen(usr->username)) == 0)
 	already_subbed = 1;
@@ -429,6 +426,33 @@ char* get_available_subscriptions()
   return buffer;
 }
 
+user* subscribe_to()
+{
+  // If user entered valid username, add to subs
+  user* user_to_sub = get_user( buffer );
+  if( user_to_sub )
+  {
+    // Allocate memory if not already
+    if( !user_to_sub->subs )
+    {
+      user_to_sub->subs = calloc( MAX_USERS, sizeof(user_to_subs->subs ) );
+    }
+    
+    // Add user to sub
+    char** ptr = user_to_subs->subs;
+    while( ptr != NULL && (strncmp( *ptr, buffer, strlen(*ptr)) != 0) )
+    {
+      if( *ptr == 0 )
+      {
+        strcpy( *ptr, buffer );
+	break;
+      }
+      ++ptr;
+    }
+  }
+}
+
+
 void handle_subscriptions()
 {
   char* main_msg = "============================\n CS164 Twitter Clone - Subscriptions \n============================\n0. Back\n1. Subscribe to\n2. Unsubscribe from.\n> ";
@@ -444,21 +468,22 @@ void handle_subscriptions()
 
     if( current_menu == 1 || current_menu == 2  ) // Subscribe or unsubscribe
     {
-
-      printf("Inside subscribe or unsubscribe\n");
       // Subscribe
       if( current_menu == 1)
       {
-	printf("Before get_available_subscriptions()\n");
 	char* msg = "You may subscribe to the following: \n";
+	// Since function returns pointer to buffer, which we are using right now, strcat will crash
+	// if we append buffer to buffer! Temporary fix right now is to copy to a temp array
 	char* msg2 = get_available_subscriptions();
+	char msg4[512];
+	strcpy( msg4, msg2 );
 	char* msg3 = "\nEnter the username of who you wish to subscribe to, or 0 to cancel:\n> ";
 
-	printf("After get_available_subscriptions()...got %s\n", msg2);
-
+	// Construct full message to send to user
 	bzero(buffer, 512);
-	//strcat( strcat( strcat( buffer, msg ), msg2 ), msg3 );
-	strcat(buffer, msg);
+	strcat( buffer, msg );
+	strcat( buffer, msg4 ); // temp array instead of msg2
+	strcat( buffer, msg3 );
 	
 	printf("after strcat...\n");
 	n = write( newsockfd, buffer, strlen(buffer) );
@@ -470,7 +495,7 @@ void handle_subscriptions()
 	get_input();
 
 	// Subscribe to selected user entered in buffer
-	//subscribe_to();
+	subscribe_to();
 
       }
       else if( current_menu == 2)
