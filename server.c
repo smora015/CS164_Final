@@ -167,7 +167,10 @@ user get_user( char* username )
 
   for( i = 0; i < MAX_USERS; ++i )
   {
-    if( strncmp( users[i].username, cmp, strlen(cmp)) == 0 )
+    if( users[i].username == NULL )
+      break;
+
+    if( strncmp( users[i].username, cmp, strlen(users[i].username)) == 0 )
       return users[i];
   }
   
@@ -435,14 +438,13 @@ user subscribe_to()
   // If user entered valid username, add to subs
   user user_to_sub = get_user( buffer );
 
-  printf("in subscribe_to after get_user\n");
   int i;
   for( i = 0; i < MAX_USERS; ++i )
   {
     if( user_to_sub.subs[i] == NULL )
     {
-      printf("NULL Sub STRING\n");
-      strcpy( user_to_sub.subs[i], buffer );
+      user_to_sub.subs[i] = user_to_sub.username;
+      //strcpy( user_to_sub.subs[i], buffer );
       return user_to_sub;
     }
     
@@ -472,15 +474,14 @@ user unsubscribe_to()
 void handle_subscriptions()
 {
   char* main_msg = "============================\n CS164 Twitter Clone - Subscriptions \n============================\n0. Back\n1. Subscribe to\n2. Unsubscribe from.\n> ";
+
+  n = write( newsockfd, main_msg, strlen(main_msg) );
+  if( n < 0 ) error("ERROR writing to socket");
   
   while( current_menu != 0 )
   {
-    n = write( newsockfd, main_msg, strlen(main_msg) );
-    if( n < 0 ) error("ERROR writing to socket");
-    
     // Read input from socket
-    get_menu_input();
-    
+    get_menu_input();    
 
     if( current_menu == 1 || current_menu == 2  ) // Subscribe or unsubscribe
     {
@@ -496,7 +497,7 @@ void handle_subscriptions()
 	char* msg3 = "\nEnter the username of who you wish to subscribe to, or 0 to cancel:\n> ";
 	
 	// Construct full message to send to user
-	bzero(buffer, 512);
+	bzero( buffer, 512 );
 	strcat( buffer, msg );
 	strcat( buffer, msg4 ); // temp array instead of msg2
 	strcat( buffer, msg3 );
@@ -508,8 +509,21 @@ void handle_subscriptions()
 	get_input();
 
 	// Subscribe to selected user entered in buffer
-	subscribe_to();
+        user subbed = subscribe_to();
 
+	bzero( buffer, 512 );	
+	if( subbed.username != NULL )
+	{
+	  snprintf( buffer, 512, "You are now subscribed to %s's posts!\n\n", subbed.username );
+	  strcat( buffer, main_msg );
+	}
+	else
+	  strcat( strcat( buffer, "Cancelled / user not found! \n\n" ), main_msg );
+
+	n = write( newsockfd, buffer, strlen( buffer ) );
+	if( n < 0 ) error("ERROR writing to socket");
+	
+	
       }
       else if( current_menu == 2)
       {
@@ -518,9 +532,9 @@ void handle_subscriptions()
 	char msg3[512];
 	char* msg4 = "\nEnter the username of who you wish to unsubscribe, or 0 to cancel:\n> ";
 	strcat( msg3, msg2 );
-	bzero(buffer, 512);
+	bzero( buffer, 512 );
 	strcat( strcat( strcat( buffer, msg ), msg3), msg4 );
-
+	
 	n = write( newsockfd, buffer, strlen(buffer) );
 	if( n < 0 ) error( "ERROR writing to socket");
 	
@@ -529,6 +543,9 @@ void handle_subscriptions()
 
 	// Subscribe to selected user entered in buffer
 	unsubscribe_to();
+	
+	n = write( newsockfd, main_msg, strlen(main_msg) );
+	if( n < 0 ) error("ERROR writing to socket");
       }
       
       
