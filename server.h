@@ -16,11 +16,11 @@ typedef struct user_struct {
   char* username;
   char* password;
 
-  int sockfd;        // The current socket the user is associated to
+  int sockfd;                     // The current socket the user is associated to
 
-  char** subs;       // Keeps track of current subscriptions
-  message* messages; // Keeps track of sent but not delivered messages
-  int message_count; // The number of messages
+  char* subs[MAX_USERS];          // Keeps track of current subscriptions
+  message messages[MAX_MESSAGES]; // Keeps track of sent but not delivered messages
+  int message_count;              // The number of messages
 } user;
 
 // Declare socket descriptors
@@ -31,27 +31,28 @@ char buffer[512];      // Buffer to hold messages
 int n = 0;             // Used to read/write from/to socket
 
 // Declare server variables
-user* users;           // List of total users
-user* users_online;    // List of currently online users
-user* current_user;    // The current user logged in
-int current_menu;      // Corresponds to what menu the user is in
-int messages_received; // Keeps track of number of messages received
+user* users;            // List of total users
+user* users_online;     // List of currently online users
+user current_user;      // The current user logged in
+int current_menu;       // Corresponds to what menu the user is in
+int messages_received;  // Keeps track of number of messages received
 
 // Error handling functions
 void error(const char *msg);
 void handle_signal( int signal );
 
 // Initialization functions
-user create_user( char* username, char* password, int sockfd, message* messages, char** subs);
-user* get_current_user( int sockfd );
-user* get_user( char* username );
+user create_user( char* username, char* password, int sockfd);
+user get_user( char* username );
 void init_data();
-int authenticate_user( int* sockfd );
+void authenticate_user();
 
 // Interface functions
 void get_input();
 void handle_menu();
 void handle_offline_messages();
+user subscribe_to();
+void handle_subscriptions();
 char* get_available_subscriptions();
 void handle_subscriptions();
 void handle_post_message();

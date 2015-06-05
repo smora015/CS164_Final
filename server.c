@@ -85,13 +85,12 @@ int main(int argc, char *argv[])
 	error("ERROR on accept");
 
       // Authenticate the user
-      authenticate_user( &newsockfd );
-      
+      authenticate_user();
+ 
       // Display main menu
-      current_menu = 0; // 0 = main menu, etc
       handle_menu(); 
 
-      // Loop for handling replies and responses to/from client
+     // Loop for handling replies and responses to/from client
       for( ;; ) 
       {	
 	// Handle command
@@ -101,7 +100,7 @@ int main(int argc, char *argv[])
 	// Log out the user if they entered '5'
 	else
 	{
-	  printf("[User %s] - Has logged off.\n", current_user->username);
+	  printf("[User %s] - Has logged off.\n", current_user.username);
 
 	  // Write to client
 	  int n = write( newsockfd,"Logged out successfully.",24);
@@ -149,45 +148,30 @@ void handle_signal( int signal )
 }
 
 
-user create_user( char* username, char* password, int sockfd, message* messages, char** subs)
+user create_user( char* username, char* password, int sockfd)
 {
   user new_user;
   new_user.username = username;
   new_user.password = password;
   new_user.sockfd = sockfd;
-  new_user.messages = messages;
   new_user.message_count = 0;
-  new_user.subs = subs;
 
   return new_user;
 }
 
-user* get_current_user( int sockfd )
+user get_user( char* username )
 {
-  user* usr = users;
-  while( usr != NULL )
+  int i;
+  char cmp[50];
+  strcpy( cmp, username );
+
+  for( i = 0; i < MAX_USERS; ++i )
   {
-    if( usr->sockfd == sockfd)
-      return usr;
-
-    ++usr; // Iterate to next user!
-  }
-
-  return NULL;
-}
- 
-user* get_user( char* username )
-{
-  user* usr = users;
-  while( usr != NULL )
-  {
-    if( strncmp( usr->username, username, strlen(username)) == 0 )
-	return usr;
-
-    ++usr; // Iterate to next user!
+    if( strncmp( users[i].username, cmp, strlen(cmp)) == 0 )
+      return users[i];
   }
   
-  return NULL;
+  return create_user( NULL, NULL, -1);
 }
 
 void init_data()
@@ -200,17 +184,14 @@ void init_data()
   users = mmap(NULL, sizeof * users * MAX_USERS, PROT_READ | PROT_WRITE, 
        MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
-  users_online = mmap(NULL, sizeof * users * MAX_USERS, PROT_READ | PROT_WRITE, 
+  users_online = mmap(NULL, sizeof * users_online * MAX_USERS, PROT_READ | PROT_WRITE, 
        MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 
-  current_user = (user*) malloc( sizeof(*current_user) );
-
-
   // Hard code 3 users
-  user tom = create_user( "tom", "tom_password", -1, NULL, NULL);
-  user chris = create_user( "chris", "chris_password", -1, NULL, NULL);
-  user sara  = create_user( "sara", "sara_password", -1, NULL, NULL);
+  user tom = create_user( "tom", "tom_password", -1);
+  user chris = create_user( "chris", "chris_password", -1);
+  user sara  = create_user( "sara", "sara_password", -1);
 
   users[0] = tom;
   users[1] = chris;
@@ -218,11 +199,11 @@ void init_data()
 
   // Initialize any counters or flags
   messages_received = 0;
-  
+  current_menu = 0;
 }
 
 // Logs in the user to post tweets
-int authenticate_user( int* sockfd )
+void authenticate_user()
 {
   // Message prompts
   char* un = "Username: ";
@@ -235,59 +216,60 @@ int authenticate_user( int* sockfd )
   user* usr; // Used to traverse list of users
   int found = 0;
   int n = 0;
+  int i = 0;
 
   char username[255];
   char password[255];
   while( found == 0)
   {    
-    usr = users; // Used to traverse list of users
     found = 0;
 
     // Prompt for username
-    n = write(*sockfd, un, strlen(un));
+    n = write(newsockfd, un, strlen(un));
 
     // Get username
     bzero(username,256);
-    n = read(*sockfd,username,255);
+    n = read(newsockfd,username,255);
   
     // Prompt for password
-    n = write(*sockfd, ps, strlen(ps));
+    n = write(newsockfd, ps, strlen(ps));
 
     // Get password
     bzero(password, 256);
-    n = read(*sockfd,password,255);
+    n = read(newsockfd,password,255);
 
-    // Traverse for user in list
-    usr = users;
-    while( usr->username != NULL )
+    for( i = 0; i < 5; ++i )
     {
+      if( users[i].username == NULL )
+	break;
+
       // Compare username entered with username in list, providing the lenght of the username in the list.
-      if( (strncmp(username,usr->username, strlen(usr->username) ) == 0) &&
-	  (strncmp(password,usr->password, strlen(usr->password) ) == 0) ) 
+      if( (strncmp(username, users[i].username, strlen(users[i].username) ) == 0) &&
+	  (strncmp(password, users[i].password, strlen(users[i].password) ) == 0) ) 
       {
 	found = 1; // Set found flag to true
-	usr->sockfd = *sockfd; // Add current socket associated to user
+	users[i].sockfd = newsockfd; // Add current socket associated to user
 
-	strcat( strcat(ss, ss1), usr->username );        // Contantenate welcome message
+	strcat( strcat(ss, ss1), users[i].username );        // Contantenate welcome message
 	char mc[20];
-	snprintf(mc, 20, "%d", usr->message_count);
+	snprintf(mc, 20, "%d", users[i].message_count);
 	strcat( strcat( strcat( ss, ss2 ), mc ), ss3);
 
-	current_user = (user*) malloc( sizeof(user) );   // Set current user
-	current_user = get_current_user( *sockfd ); 
-	printf("[User %s] - Is now online.\n", current_user->username);
+	current_user = get_user( users[i].username ); 
+	printf("[User %s] - Is now online.\n", current_user.username);
 
+	break;
       }
-      ++usr; // Iterate to next user
+
     }
     
     // If user could not be validated, display invalid message and loop back
     if( found == 0 )
-      n = write(*sockfd, iv, strlen(iv));
+      n = write(newsockfd, iv, strlen(iv));
   }
 
   // Display successful login message
-  n = write(*sockfd, ss, strlen(ss));
+  n = write(newsockfd, ss, strlen(ss));
 }
 
 void get_input()
@@ -308,12 +290,9 @@ void get_menu_input()
   if( strlen(buffer) == 0 )
     current_menu = 0;
   else
-    {
       current_menu = atoi( (const char*) buffer ); 
-      //printf("Received: %d\n", current_menu);
-    }
-
 }
+
 void handle_menu()
 {
   int n;
@@ -325,7 +304,7 @@ void handle_menu()
 1. Offline Messages\n2. Edit Subscriptions\n3. Post a message\n4. Hashtag search\n5. Logout (or 'quit')\n> ";
 
     // Display main message
-    int n = write( newsockfd,main_msg,strlen(main_msg));
+    n = write( newsockfd,main_msg,strlen(main_msg));
     if (n < 0) error("ERROR writing to socket");
 
     // Read input from socket
@@ -351,7 +330,7 @@ void handle_menu()
   else // Invalid input
   {
     char* msg = "\n>";
-    int n = write( newsockfd, msg, strlen(msg) );
+    n = write( newsockfd, msg, strlen(msg) );
     if( n < 0 ) error("ERROR writing socket!");
 
     // Read input from socket
@@ -367,7 +346,7 @@ void handle_offline_messages()
   char* main_msg = "============================\n CS164 Twitter Clone - Offline Messages \n============================\n0. Back\n";
   while( current_menu != 0 )
   {
-    if( current_user->messages == NULL )
+    if( current_user.messages[0].message == NULL )
     {
       char * msg = "You have don't have any offline messages.\n> ";
       bzero(buffer,512);
@@ -393,65 +372,102 @@ void handle_offline_messages()
   
 }
 
-
-char* get_available_subscriptions()
+char* get_current_subscriptions()
 {
   bzero(buffer, 512); // Store all available subs in buffer
-  user* usr = users;  // Pointer to users
   char** sub;         // Pointer to subscriptions
-  int already_subbed; // Flag to check if already subscribed
 
-  while( usr->username != NULL )
+  sub = current_user.subs;
+  int i;
+  for( i = 0; i < MAX_USERS; ++i )
   {
-    // Iterate through each user, and checking if its not in current subscriptions
-    sub = current_user->subs;
-    already_subbed = 0;
-    while( sub != NULL && (strncmp(usr->username, current_user->username, strlen(usr->username)) != 0) )
-    {
-      // Only check for those who are not already subscribed
-      if( strncmp( *sub, usr->username, strlen(usr->username)) == 0)
-	already_subbed = 1;
-
-      ++sub; // Iterate to next sub
-    }
-
-    if( !already_subbed )
-    {
-      strcat( strcat( strcat( buffer, "~~> "), usr->username), ",\n");
-    }
-
-    ++usr; // Iterate to next user
+    if( sub[i] != NULL )
+      strcat( strcat( strcat( buffer, "~~> "), sub[i]), ",\n");
+    else
+      break;
   }
 
   return buffer;
 }
 
-user* subscribe_to()
+char* get_available_subscriptions()
 {
-  // If user entered valid username, add to subs
-  user* user_to_sub = get_user( buffer );
-  if( user_to_sub )
+  bzero(buffer, 512);                     // Store all available subs in buffer
+  char** sub = current_user.subs;         // Pointer to subscriptions
+  int already_subbed = 1;                 // Flag to check if already subscribed
+
+  int i = 0;
+  int j = 0;
+  for( i = 0; i < MAX_USERS; ++i )
   {
-    // Allocate memory if not already
-    if( !user_to_sub->subs )
+    already_subbed = 0;
+
+    // Iterate through each user
+    if( users[i].username == NULL )
+      break;
+
+    // Make sure to not list current user as subscribe-able
+    if( (strncmp( users[i].username, current_user.username, strlen(current_user.username)) == 0 ) )
+      continue;
+
+    for( j = 0; j < MAX_USERS; ++j )
     {
-      user_to_sub->subs = calloc( MAX_USERS, sizeof(user_to_subs->subs ) );
-    }
-    
-    // Add user to sub
-    char** ptr = user_to_subs->subs;
-    while( ptr != NULL && (strncmp( *ptr, buffer, strlen(*ptr)) != 0) )
-    {
-      if( *ptr == 0 )
-      {
-        strcpy( *ptr, buffer );
+      // Iterate through each sub
+      if( sub[j] == NULL )
 	break;
-      }
-      ++ptr;
+
+      // Only check for those who are not already subscribed
+      if( strncmp( sub[j], users[i].username, strlen(users[i].username)) == 0)
+	already_subbed = 1;
+
     }
+
+    if( !already_subbed )
+      strcat( strcat( strcat( buffer, "~~> "), users[i].username), ",\n");
+
   }
+
+  return buffer;
 }
 
+user subscribe_to()
+{
+  // If user entered valid username, add to subs
+  user user_to_sub = get_user( buffer );
+
+  printf("in subscribe_to after get_user\n");
+  int i;
+  for( i = 0; i < MAX_USERS; ++i )
+  {
+    if( user_to_sub.subs[i] == NULL )
+    {
+      printf("NULL Sub STRING\n");
+      strcpy( user_to_sub.subs[i], buffer );
+      return user_to_sub;
+    }
+    
+  }
+  
+  return create_user(NULL, NULL, -1);
+}
+
+user unsubscribe_to()
+{
+  // If user entered valid username, add to subs
+  user user_to_unsub = current_user;
+
+  int i;
+  for( i = 0; i < MAX_USERS; ++i )
+  {
+    if( (strncmp( user_to_unsub.subs[i], buffer, strlen(user_to_unsub.subs[i]) ) == 0)  )
+    {
+      user_to_unsub.subs[i] = '\0';
+      return user_to_unsub;
+    }
+  }
+
+  return create_user(NULL, NULL, -1);
+}
 
 void handle_subscriptions()
 {
@@ -471,25 +487,22 @@ void handle_subscriptions()
       // Subscribe
       if( current_menu == 1)
       {
-	char* msg = "You may subscribe to the following: \n";
+	char* msg = "\nYou may subscribe to the following: \n";
 	// Since function returns pointer to buffer, which we are using right now, strcat will crash
 	// if we append buffer to buffer! Temporary fix right now is to copy to a temp array
 	char* msg2 = get_available_subscriptions();
 	char msg4[512];
 	strcpy( msg4, msg2 );
 	char* msg3 = "\nEnter the username of who you wish to subscribe to, or 0 to cancel:\n> ";
-
+	
 	// Construct full message to send to user
 	bzero(buffer, 512);
 	strcat( buffer, msg );
 	strcat( buffer, msg4 ); // temp array instead of msg2
 	strcat( buffer, msg3 );
 	
-	printf("after strcat...\n");
 	n = write( newsockfd, buffer, strlen(buffer) );
 	if( n < 0 ) error( "ERROR writing to socket");
-
-	printf("after writing total subscriptions to user...\n");
 
 	// Get input and place into buffer
 	get_input();
@@ -500,15 +513,22 @@ void handle_subscriptions()
       }
       else if( current_menu == 2)
       {
-	const char* msg = "You may unsubscribed from your current subs listed below: \n";
-	
+	const char* msg = "You may unsubscribe from your current subs listed below: \n";
+	char * msg2 = get_current_subscriptions();
+	char msg3[512];
+	char* msg4 = "\nEnter the username of who you wish to unsubscribe, or 0 to cancel:\n> ";
+	strcat( msg3, msg2 );
 	bzero(buffer, 512);
-	strcat( buffer, msg );
+	strcat( strcat( strcat( buffer, msg ), msg3), msg4 );
+
 	n = write( newsockfd, buffer, strlen(buffer) );
 	if( n < 0 ) error( "ERROR writing to socket");
 	
 	// Get input
 	get_input();
+
+	// Subscribe to selected user entered in buffer
+	unsubscribe_to();
       }
       
       
