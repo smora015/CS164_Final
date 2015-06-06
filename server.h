@@ -20,6 +20,8 @@ typedef struct user_struct {
 
   char* subs[MAX_USERS];          // Keeps track of current subscriptions
   message messages[MAX_MESSAGES]; // Keeps track of sent but not delivered messages
+
+  int online;                     // Determines if user is online
   int message_count;              // The number of messages
 } user;
 
@@ -32,8 +34,7 @@ int n = 0;             // Used to read/write from/to socket
 
 // Declare server variables
 user* users;            // List of total users
-user* users_online;     // List of currently online users
-user current_user;      // The current user logged in
+user* current_user;     // A pointer to the current user logged in
 int current_menu;       // Corresponds to what menu the user is in
 int messages_received;  // Keeps track of number of messages received
 
@@ -52,7 +53,9 @@ void get_input();
 void handle_menu();
 void handle_offline_messages();
 user subscribe_to();
+user unsubscribe_to();
 void handle_subscriptions();
+char* get_current_subscriptions();
 char* get_available_subscriptions();
 void handle_subscriptions();
 void handle_post_message();

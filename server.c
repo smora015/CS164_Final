@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 	// Log out the user if they entered '5'
 	else
 	{
-	  printf("[User %s] - Has logged off.\n", current_user.username);
+	  printf("[User %s] - Has logged off.\n", current_user->username);
 
 	  // Write to client
 	  int n = write( newsockfd,"Logged out successfully.",24);
@@ -155,6 +155,7 @@ user create_user( char* username, char* password, int sockfd)
   new_user.password = password;
   new_user.sockfd = sockfd;
   new_user.message_count = 0;
+  new_user.online = 0;
 
   return new_user;
 }
@@ -187,10 +188,6 @@ void init_data()
   users = mmap(NULL, sizeof * users * MAX_USERS, PROT_READ | PROT_WRITE, 
        MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
-  users_online = mmap(NULL, sizeof * users_online * MAX_USERS, PROT_READ | PROT_WRITE, 
-       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-
   // Hard code 3 users
   user tom = create_user( "tom", "tom_password", -1);
   user chris = create_user( "chris", "chris_password", -1);
@@ -199,7 +196,7 @@ void init_data()
   users[0] = tom;
   users[1] = chris;
   users[2] = sara;
-
+  
   // Initialize any counters or flags
   messages_received = 0;
   current_menu = 0;
@@ -246,20 +243,27 @@ void authenticate_user()
       if( users[i].username == NULL )
 	break;
 
+
+      if( users[i].online == 1 )
+	printf("[Status] %s is also online!\n", users[i].username);
+
       // Compare username entered with username in list, providing the lenght of the username in the list.
       if( (strncmp(username, users[i].username, strlen(users[i].username) ) == 0) &&
 	  (strncmp(password, users[i].password, strlen(users[i].password) ) == 0) ) 
       {
 	found = 1; // Set found flag to true
 	users[i].sockfd = newsockfd; // Add current socket associated to user
+	users[i].online = 1;         // Set online flag to 1
 
-	strcat( strcat(ss, ss1), users[i].username );        // Contantenate welcome message
+	// Contacenate message
+	strcat( strcat(ss, ss1), users[i].username );
 	char mc[20];
 	snprintf(mc, 20, "%d", users[i].message_count);
 	strcat( strcat( strcat( ss, ss2 ), mc ), ss3);
 
-	current_user = get_user( users[i].username ); 
-	printf("[User %s] - Is now online.\n", current_user.username);
+	// Set current_user in this thread to the user who just logged in
+	current_user = &users[i]; 
+	printf("[User %s] - Is now online.\n", current_user->username);
 
 	break;
       }
@@ -349,7 +353,7 @@ void handle_offline_messages()
   char* main_msg = "============================\n CS164 Twitter Clone - Offline Messages \n============================\n0. Back\n";
   while( current_menu != 0 )
   {
-    if( current_user.messages[0].message == NULL )
+    if( current_user->messages[0].message == NULL )
     {
       char * msg = "You have don't have any offline messages.\n> ";
       bzero(buffer,512);
@@ -380,14 +384,14 @@ char* get_current_subscriptions()
   bzero(buffer, 512); // Store all available subs in buffer
   char** sub;         // Pointer to subscriptions
 
-  sub = current_user.subs;
+  // Get the subs of the current user
+  sub = current_user->subs;
   int i;
   for( i = 0; i < MAX_USERS; ++i )
   {
     if( sub[i] != NULL )
       strcat( strcat( strcat( buffer, "~~> "), sub[i]), ",\n");
-    else
-      break;
+    else break;
   }
 
   return buffer;
@@ -396,7 +400,7 @@ char* get_current_subscriptions()
 char* get_available_subscriptions()
 {
   bzero(buffer, 512);                     // Store all available subs in buffer
-  char** sub = current_user.subs;         // Pointer to subscriptions
+  char** sub = current_user->subs;        // Pointer to subscriptions
   int already_subbed = 1;                 // Flag to check if already subscribed
 
   int i = 0;
@@ -410,7 +414,7 @@ char* get_available_subscriptions()
       break;
 
     // Make sure to not list current user as subscribe-able
-    if( (strncmp( users[i].username, current_user.username, strlen(current_user.username)) == 0 ) )
+    if( (strncmp( users[i].username, current_user->username, strlen(current_user->username)) == 0 ) )
       continue;
 
     for( j = 0; j < MAX_USERS; ++j )
@@ -422,14 +426,14 @@ char* get_available_subscriptions()
       // Only check for those who are not already subscribed
       if( strncmp( sub[j], users[i].username, strlen(users[i].username)) == 0)
 	already_subbed = 1;
-
+      
     }
-
+    
     if( !already_subbed )
       strcat( strcat( strcat( buffer, "~~> "), users[i].username), ",\n");
-
+    
   }
-
+  
   return buffer;
 }
 
@@ -437,37 +441,68 @@ user subscribe_to()
 {
   // If user entered valid username, add to subs
   user user_to_sub = get_user( buffer );
-
   int i;
-  for( i = 0; i < MAX_USERS; ++i )
+
+  // Make sure input is a valid user
+  if( user_to_sub.username != NULL )
   {
-    if( user_to_sub.subs[i] == NULL )
+    // Iterate through current_user's subs
+    for( i = 0; i < MAX_USERS; ++i )
     {
-      user_to_sub.subs[i] = user_to_sub.username;
-      //strcpy( user_to_sub.subs[i], buffer );
-      return user_to_sub;
-    }
+	if( current_user->subs[i] == NULL )
+	{
+	  current_user->subs[i] = user_to_sub.username;
+	  return user_to_sub;
+	}
     
+    }
   }
-  
   return create_user(NULL, NULL, -1);
 }
 
 user unsubscribe_to()
 {
   // If user entered valid username, add to subs
-  user user_to_unsub = current_user;
+  user user_to_unsub = get_user( buffer );
 
   int i;
-  for( i = 0; i < MAX_USERS; ++i )
+
+  if( user_to_unsub.username != NULL )
   {
-    if( (strncmp( user_to_unsub.subs[i], buffer, strlen(user_to_unsub.subs[i]) ) == 0)  )
+    for( i = 0; i < MAX_USERS; ++i )
     {
-      user_to_unsub.subs[i] = '\0';
-      return user_to_unsub;
+      if( (strncmp( current_user->subs[i], user_to_unsub.username, strlen(current_user->subs[i]) ) == 0)  )
+      {
+	// If we're not the last possible user, then make sure we don't cut off users after user_to_unsub
+	if( (i+1) < MAX_USERS )
+	{
+	  // If there's a sub ahead of user_to_unsub in the array, move back up
+	  if( current_user->subs[i+1] != NULL )
+	  {
+	    int j;
+	    for( j = i; j < MAX_USERS-1; ++j )
+	    {
+	      if( current_user->subs[j+1] == NULL )
+	      {
+		current_user->subs[j] = NULL;
+		break;
+	      }
+	      else
+		current_user->subs[j] = current_user->subs[j+1];
+	    }
+	  }
+	  // If there isn't a sub ahead, just make user_to_unsub's location NULL
+	  else
+	    current_user->subs[i] = NULL;
+	}
+	// If we're the last possible user, just make null
+	else
+	  current_user->subs[i] = NULL;
+
+	return user_to_unsub;
+      }
     }
   }
-
   return create_user(NULL, NULL, -1);
 }
 
@@ -494,7 +529,7 @@ void handle_subscriptions()
 	char* msg2 = get_available_subscriptions();
 	char msg4[512];
 	strcpy( msg4, msg2 );
-	char* msg3 = "\nEnter the username of who you wish to subscribe to, or 0 to cancel:\n> ";
+	char* msg3 = ( (strlen(msg2) > 0) ? "\nEnter the username of who you wish to subscribe to, or 0 to cancel:\n> " : "There are no users to subscribe to! Press enter to continue.\n");
 	
 	// Construct full message to send to user
 	bzero( buffer, 512 );
@@ -530,11 +565,12 @@ void handle_subscriptions()
 	const char* msg = "You may unsubscribe from your current subs listed below: \n";
 	char * msg2 = get_current_subscriptions();
 	char msg3[512];
-	char* msg4 = "\nEnter the username of who you wish to unsubscribe, or 0 to cancel:\n> ";
-	strcat( msg3, msg2 );
+	char* msg4 = ( (strlen(msg2) > 0) ? "\nEnter the username of who you wish to unsubscribe, or 0 to cancel:\n> ": "There are no users for you to unsubscribe from. Press enter to continue.\n") ;
+	strcpy( msg3, msg2 );
+
+	// Display users to unsub from
 	bzero( buffer, 512 );
 	strcat( strcat( strcat( buffer, msg ), msg3), msg4 );
-	
 	n = write( newsockfd, buffer, strlen(buffer) );
 	if( n < 0 ) error( "ERROR writing to socket");
 	
@@ -542,32 +578,100 @@ void handle_subscriptions()
 	get_input();
 
 	// Subscribe to selected user entered in buffer
-	unsubscribe_to();
-	
-	n = write( newsockfd, main_msg, strlen(main_msg) );
+	user unsubbed = unsubscribe_to();
+
+	// Display new status
+	bzero( buffer, 512 );	
+	if( unsubbed.username != NULL )
+	{
+	  snprintf( buffer, 512, "You have unsubscribed from %s's posts!\n\n", unsubbed.username );
+	  strcat( buffer, main_msg );
+	}
+	else
+	  strcat( strcat( buffer, "Cancelled / user not found! \n\n" ), main_msg );
+
+	n = write( newsockfd, buffer, strlen(buffer) );
 	if( n < 0 ) error("ERROR writing to socket");
       }
-      
       
     }
   }
 }
 
+void post_message()
+{
+  int subscribed = 0; // Flag to check for any valid subscribers
+  int i, j;
+  for( i = 0; i < MAX_USERS; ++i )
+  {
+    // End of valid users
+    if( users[i].username == NULL )
+      break;
+
+    if( users[i].subs[0] != NULL )
+    {
+      // Traverse through all users who's subs include current_user
+      for( j = 0; j < MAX_USERS; ++j )
+      {
+	// End of valid subs
+	if( users[i].subs[j] == NULL )
+	{
+	  break;
+	}
+
+	// If user is subscribed to current_user
+	if( (strncmp(users[i].subs[j], current_user->username, strlen(current_user->username)) == 0 ) )
+	{
+	  // Set flag to signal that current_user does have people following him/her
+	  subscribed = 1;
+	  
+	  // Send a message in realtime if they are online
+	  if( users[i].online == 1 )
+	  {
+	    printf("[Status] - Post Message: Sending message to %s in realtime\n", users[i].username );
+	  }
+	  // Otherwise send message offline
+	  else
+	  {
+	    printf("Sending message to %s offline\n", users[i].username );
+	  }
+	}
+      } 
+    }
+    
+    else
+      printf(" who does NOT have subscriptions \n");
+
+  }
+
+}
 
 void handle_post_message()
 {
-  char* main_msg = "====================\n CS164 Twitter Clone - Post a Message to Subscriptions \n====================\n0. Back\n> ";
+  char* main_msg = "====================\n CS164 Twitter Clone - Post a Message to Subscriptions \n====================\n0. Back\n1. Post message to users following you\n> ";
   
   while( current_menu != 0 )
-  {
-    
+  {    
+    // Display menu
     n = write( newsockfd, main_msg, strlen(main_msg) );
     if( n < 0 ) error("ERROR writing to socket");
     
-    
-    // Read input from socket
+    // Read 
     get_menu_input();
     
+    if( current_menu == 1 )
+    {
+      // Display send message menu
+      char* msg = "What would you like to send? (Max 140 characters) Or press enter to go back.\n> ";
+      n = write( newsockfd, msg, strlen(main_msg) );
+      if( n < 0 ) error("ERROR writing to socket");
+      
+      // Read message into buffer
+      get_input();
+
+      // Send message to users
+      post_message();
+    }
   }
   
 }

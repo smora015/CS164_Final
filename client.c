@@ -9,6 +9,8 @@
 
 #include <netdb.h>
 
+#include <sys/wait.h> // fork()
+#include <errno.h>
 
 /* 
    Client Side Specifications:
@@ -57,6 +59,8 @@ int main(int argc, char *argv[])
 	server->h_length);
   serv_addr.sin_port = htons(portno);            // Specify port #
 
+
+
   // Connect to server
   if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
   {
@@ -66,6 +70,34 @@ int main(int argc, char *argv[])
 
   for( ;; )
   {
+
+    /*
+
+      Beginnings of forking client process for reading and writing parallely.
+    pid_t pid = 0;
+    for(;;)
+      {
+	newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+	printf("Accepted port!\n");
+	// Fork a new process whenever a new client connects
+	pid = fork();
+	if ( pid < 0 )
+	  {
+	    error("fork()");
+	    //don't go here!
+	    continue;
+	  }
+	else if(pid > 0) // Parent/Server process
+	  {
+	    //printf("Parent PID.\n");
+	    continue;
+	  }
+	else if(pid == 0) // Child/Client process
+	  {
+
+	    */
+
+
     // Get response from server
     bzero(buffer,256);
     n = read(sockfd,buffer,255);
