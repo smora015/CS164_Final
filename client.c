@@ -11,6 +11,9 @@
 
 #include <sys/wait.h> // fork()
 #include <errno.h>
+#include <signal.h>  // Used for handling SIGINT (ctrl+c)
+#include <sys/mman.h>
+#include <pthread.h> // pthread functions & data for parallelism
 
 /* 
    Client Side Specifications:
@@ -39,7 +42,11 @@ int main(int argc, char *argv[])
   // Set up variables for sockets
   int sockfd;            // Socket file descriptor
   int portno = 7158;     // Port #
-  char buffer[256];      // Buffer to hold messages
+  char snd_buffer[256];  // Buffer to send messages
+  char rcv_buffer[256];  // Buffer to receive messsages
+
+  int* log_out = mmap(NULL, sizeof(log_out), PROT_READ | PROT_WRITE, 
+       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
   struct sockaddr_in serv_addr; // Holds address of server socket
   struct hostent *server = gethostbyname( "localhost" ); // Holds hostname of server
@@ -68,68 +75,60 @@ int main(int argc, char *argv[])
     error("ERROR connecting");
   }
 
+  pid_t pid = 0;
+  pid = fork();  // Fork a new process at this point. Parallelize write and read from socket
   for( ;; )
   {
-
-    /*
-
-      Beginnings of forking client process for reading and writing parallely.
-    pid_t pid = 0;
-    for(;;)
-      {
-	newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-	printf("Accepted port!\n");
-	// Fork a new process whenever a new client connects
-	pid = fork();
-	if ( pid < 0 )
-	  {
-	    error("fork()");
-	    //don't go here!
-	    continue;
-	  }
-	else if(pid > 0) // Parent/Server process
-	  {
-	    //printf("Parent PID.\n");
-	    continue;
-	  }
-	else if(pid == 0) // Child/Client process
-	  {
-
-	    */
-
-
-    // Get response from server
-    bzero(buffer,256);
-    n = read(sockfd,buffer,255);
-    if (n < 0) 
+    if ( pid < 0 )
     {
-      close(sockfd);
-      error("ERROR reading from socket");
+      error("fork()");
+      //don't go here!
+      continue;
     }
-
-    // If logged out, confirm message
-    if( strncmp(buffer,"Logged out successfully.",24) == 0 )
-    {
-      printf("%s\n", buffer );
-      break;
-    }
-    else
-      printf("%s",buffer );
     
-    // Get message from user
-    //printf("message: ");
-    bzero(buffer,256);
-    fgets(buffer,255,stdin);
+    else if(pid > 0) // Parent/Server process - Send messages
+    {
+      if( log_out == 1 )
+	exit(0);
 
-    // Send to server
-    n = write(sockfd,buffer,strlen(buffer));
-    if (n < 0) 
+      // Get message from user
+      //printf("message: ");
+      bzero(snd_buffer,256);
+      fgets(snd_buffer,255,stdin);
+
+      // Send to server
+      n = write(sockfd,snd_buffer,strlen(snd_buffer));
+      if (n < 0) 
       {
 	close(sockfd);
 	error("ERROR writing to socket");
       }
+    }
+    
+    else if(pid == 0) // Child/Client process - Receive messages
+    {
 
+      // Get response from server
+      bzero(rcv_buffer,256);
+      n = read(sockfd,rcv_buffer,255);
+      if (n < 0) 
+      {
+	close(sockfd);
+	error("ERROR reading from socket");
+      }
 
+      // If logged out, confirm message
+      if( strncmp(rcv_buffer,"Logged out successfully.",24) == 0 )
+      {
+	printf("%s\n", rcv_buffer );
+	log_out = 1; // Tell server to exit as well
+	exit(0);
+	break;
+      }
+      else
+	printf("%s", rcv_buffer );
+
+    }
   }
 
   close(sockfd);

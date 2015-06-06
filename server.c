@@ -71,15 +71,6 @@ int main(int argc, char *argv[])
     }
     else if(pid == 0) // Child/Client process
     {
-
-      /*
-
-
-	MUST IMPLEMENT SHARING GLOBAL MEMORY!!!!!! 
-	http://stackoverflow.com/questions/13274786/how-to-share-memory-between-process-fork
-
-      */
-
       // Socket failed to accept to client
       if (newsockfd < 0) 
 	error("ERROR on accept");
