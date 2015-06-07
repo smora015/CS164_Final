@@ -460,10 +460,14 @@ user unsubscribe_to()
 
   if( user_to_unsub.username != NULL )
   {
+    // Iterate through all of user's subs
     for( i = 0; i < MAX_USERS; ++i )
     {
+      // If we've found user's sub to remove, then proceed
       if( (strncmp( current_user->subs[i], user_to_unsub.username, strlen(current_user->subs[i]) ) == 0)  )
       {
+
+
 	// If we're not the last possible user, then make sure we don't cut off users after user_to_unsub
 	if( (i+1) < MAX_USERS )
 	{
@@ -491,6 +495,8 @@ user unsubscribe_to()
 	  current_user->subs[i] = NULL;
 
 	return user_to_unsub;
+
+
       }
     }
   }
@@ -591,7 +597,11 @@ void handle_subscriptions()
 
 void post_message()
 {
-  int subscribed = 0; // Flag to check for any valid subscribers
+  // Create message
+  char message[256];
+  bzero( message, 255 );
+  strcat( strcat( strcat( strcat( strcat( message, "\n[User "), current_user->username), "] - "), buffer ), "\n");
+
   int i, j;
   for( i = 0; i < MAX_USERS; ++i )
   {
@@ -612,14 +622,12 @@ void post_message()
 
 	// If user is subscribed to current_user
 	if( (strncmp(users[i].subs[j], current_user->username, strlen(current_user->username)) == 0 ) )
-	{
-	  // Set flag to signal that current_user does have people following him/her
-	  subscribed = 1;
-	  
+	{	  
 	  // Send a message in realtime if they are online
 	  if( users[i].online == 1 )
 	  {
-	    printf("[Status] - Post Message: Sending message to %s in realtime\n", users[i].username );
+	    // Send message and get junk input (enter) to proceed to menu
+	    write( users[i].sockfd, message, strlen(message) );
 	  }
 	  // Otherwise send message offline
 	  else
@@ -629,9 +637,6 @@ void post_message()
 	}
       } 
     }
-    
-    else
-      printf(" who does NOT have subscriptions \n");
 
   }
 

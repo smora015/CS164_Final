@@ -75,8 +75,7 @@ int main(int argc, char *argv[])
     error("ERROR connecting");
   }
 
-  pid_t pid = 0;
-  pid = fork();  // Fork a new process at this point. Parallelize write and read from socket
+  pid_t pid = fork();
   for( ;; )
   {
     if ( pid < 0 )
@@ -85,29 +84,8 @@ int main(int argc, char *argv[])
       //don't go here!
       continue;
     }
-    
-    else if(pid > 0) // Parent/Server process - Send messages
+    else if(pid == 0) // Child/Client process
     {
-      if( log_out == 1 )
-	exit(0);
-
-      // Get message from user
-      //printf("message: ");
-      bzero(snd_buffer,256);
-      fgets(snd_buffer,255,stdin);
-
-      // Send to server
-      n = write(sockfd,snd_buffer,strlen(snd_buffer));
-      if (n < 0) 
-      {
-	close(sockfd);
-	error("ERROR writing to socket");
-      }
-    }
-    
-    else if(pid == 0) // Child/Client process - Receive messages
-    {
-
       // Get response from server
       bzero(rcv_buffer,256);
       n = read(sockfd,rcv_buffer,255);
@@ -116,21 +94,43 @@ int main(int argc, char *argv[])
 	close(sockfd);
 	error("ERROR reading from socket");
       }
-
+    
       // If logged out, confirm message
       if( strncmp(rcv_buffer,"Logged out successfully.",24) == 0 )
       {
 	printf("%s\n", rcv_buffer );
-	log_out = 1; // Tell server to exit as well
+	*log_out = 1; // Tell server to exit as well
 	exit(0);
 	break;
       }
       else
 	printf("%s", rcv_buffer );
+      fflush(stdout);
+    } /* child process */
 
-    }
-  }
+    else if(pid > 0) // Parent/Server process
+    {
+      if( *log_out == 1 )
+      {
+	exit(0);
+      }
 
+      // Get message from user
+      bzero(snd_buffer,256);
+      fgets(snd_buffer,255,stdin);
+      
+      // Send to server
+      n = write(sockfd,snd_buffer,strlen(snd_buffer));
+      if (n < 0) 
+      {
+	close(sockfd);
+	error("ERROR writing to socket");
+      } 
+      fflush(stdout);
+
+    } /* parent process */
+
+  } /* for( ;; ) */
   close(sockfd);
   return 0; 
 
