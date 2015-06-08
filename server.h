@@ -14,6 +14,12 @@ typedef struct messages_struct {
   char message[MAX_TWEET_LENGTH];
 } message;
 
+typedef struct hashtag_struct {
+  char* hashtag;
+  char messages[MAX_MESSAGES][30];
+  int count;
+} hashtag;
+
 typedef struct user_struct {
   // Identification variables
   char username[MAX_LENGTH];
@@ -23,7 +29,7 @@ typedef struct user_struct {
   // Data variables
   char subs[MAX_USERS][MAX_LENGTH]; // Keeps track of current subscriptions
   message messages[MAX_MESSAGES];   // Keeps track of sent but not delivered messages
-  char hashtags[MAX_MESSAGES][30];  // Keeps track of hashtags
+  hashtag hashtags[30];
 
   // Status variables
   int online;                       // Determines if user is online

@@ -741,21 +741,66 @@ void post_message()
 	char* ht = strstr( buffer, "#" );
 	if( ht != NULL )
 	{
-	  printf("found hashtag!\n");
-	  char ht_msg[30];
-	  
-	  char* ptr = ht;
-	  ++ptr; // Skip the '#'
+	  // Get message up until the hashtag and place into string
+	  char bff[50];
 	  int i = 0;
-	  while( (*ptr >= 33) && (*ptr <= 122)  )
+	  char* ptr1 = buffer;
+	  while( *ptr1 != '#' )
+	  {
+	    bff[i] = *ptr1;
+	    ++ptr1;
+	    ++i;
+	  }
+
+	  // Place the hashtag name into string
+	  printf("found hashtag!\n");
+	  char ht_name[30];
+
+	  char* ptr2 = ht;
+	  ++ptr2; // Skip the '#'
+	  i = 0;
+	  while( (*ptr2 >= 33) && (*ptr2 <= 122)  )
 	  {
 	    // While pointer is a valid char, add to hashtag for user
-	    current_user->hashtags[ current_user->hashtag_count ][i] = *ptr;
+	    ht_name[i] = *ptr2;
+	    //current_user->hashtags[ current_user->hashtag_count ].hashtag[i] = *ptr;
 	    ++i;
-	    ++ptr;
+	    ++ptr2;
 	  }
-	  current_user->hashtags[ current_user->hashtag_count ][i] = '\0';  // Append 0 to signal end of string
-	  ++current_user->hashtag_count; // Increment current user's hashtag count
+	  ht_name[i] = '\0'; // Signal end of string
+
+
+	  // Search to see if hashtag is there already
+	  int found = -1;
+	  for( i = 0; i < current_user->hashtag_count; ++i )
+	  {
+	    if( (strncmp( current_user->hashtags[i].hashtag, ht_name, strlen(ht_name) ) == 0 ) )
+	      found = i;
+	  }
+
+	  if( found == -1 )
+	  {
+	    // Not found, create new hashtag
+	    strncpy( current_user->hashtags[ current_user->hashtag_count ].hashtag, ht_name, strlen(bff) );
+	    current_user->hashtags[ current_user->hashtag_count ].count = 0;
+
+	    // Then add messsage
+	    strncpy( current_user->hashtags[ current_user->hashtag_count ].messages[ current_user->hashtags[ current_user->hashtag_count ].count ], bff, strlen(bff) );
+
+	    ++current_user->hashtags[ current_user->hashtag_count ].count; // Increment message count
+	    ++current_user->hashtag_count; // Increment current user's hashtag count
+
+	  }
+	  else
+	  {
+	    // Hashtag found, now add on to it
+	    strncpy( current_user->hashtags[ found ].messages[ current_user->hashtags[ found ].count ], bff, strlen(bff) );
+	    ++current_user->hashtags[ found ].count;
+	  }
+
+
+
+
 	}
 
       }
@@ -798,9 +843,18 @@ void handle_post_message()
 
 void search_hashtags()
 {
+  n = write( newsockfd, "Enter the hastag you'd like to search:\n> ", strlen( "Enter the hastag you'd like to search:\n> ") );
+  if( n < 0 )
+    error("failed to write socket" );
+
+  // Move hashtag to be searched in a var
+  get_input();
+  char compare[30];
+  strncpy( compare, buffer, strlen(buffer) );
+
   // Traverse through user's hashtags
   bzero(buffer, 512);
-  int i, j;
+  int i, j, k;
 
   strcat( buffer, "Found the following hashtags from friends:\n" );
   for( j = 0; j < MAX_USERS; ++j )
@@ -810,10 +864,17 @@ void search_hashtags()
 
     for( i = 0; i < users[j].hashtag_count; ++i )
     {
-      if( strlen( users[j].hashtags[i]) > 0 )
+
+      // If we've found the hashtag, add to buffer to output
+      if( (strncmp( compare, users[j].hashtags[i].hashtag, strlen(compare)) == 0 ) )
       {
-	strcat( strcat( strcat( strcat( buffer, users[i].username ), " - " ), users[j].hashtags[i] ), "\n");
+	for( k = 0; k < users[j].hashtags[i].count; ++k )
+	  {
+	    strcat( strcat( strcat( strcat( strcat( strcat( buffer, users[j].username ), " - " ), users[j].hashtags[i].hashtag ), "\n"), users[j].hashtags[i].messages[k]), "\n");
+
+	  }
       }
+      
     }
   }
 }
