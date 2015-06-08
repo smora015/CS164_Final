@@ -42,8 +42,8 @@ int main(int argc, char *argv[])
   // Set up variables for sockets
   int sockfd;            // Socket file descriptor
   int portno = 7158;     // Port #
-  char snd_buffer[256];  // Buffer to send messages
-  char rcv_buffer[256];  // Buffer to receive messsages
+  char snd_buffer[512];  // Buffer to send messages
+  char rcv_buffer[512];  // Buffer to receive messsages
 
   int* log_out = mmap(NULL, sizeof(log_out), PROT_READ | PROT_WRITE, 
        MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -87,8 +87,8 @@ int main(int argc, char *argv[])
     else if(pid == 0) // Child/Client process
     {
       // Get response from server
-      bzero(rcv_buffer,256);
-      n = read(sockfd,rcv_buffer,255);
+      bzero(rcv_buffer,512);
+      n = read(sockfd,rcv_buffer,512);
       if (n < 0) 
       {
 	close(sockfd);
@@ -116,8 +116,8 @@ int main(int argc, char *argv[])
       }
 
       // Get message from user
-      bzero(snd_buffer,256);
-      fgets(snd_buffer,255,stdin);
+      bzero(snd_buffer,512);
+      fgets(snd_buffer,512,stdin);
       
       // Send to server
       n = write(sockfd,snd_buffer,strlen(snd_buffer));
