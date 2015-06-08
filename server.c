@@ -152,6 +152,8 @@ user create_user( char* username, char* password, int sockfd)
   *new_user.sockfd = sockfd;
   new_user.message_count = 0;
   new_user.online = 0;
+  new_user.hashtag_count = 0;
+  new_user.hashtags[ 0 ].count = 0;
 
   // Format strings
   int i;
@@ -580,7 +582,7 @@ void handle_subscriptions()
         user subbed = subscribe_to();
 
 	bzero( buffer, 512 );	
-	if( subbed.username != NULL )
+	if( strlen(subbed.username) != 0 )
 	{
 	  snprintf( buffer, 512, "You are now subscribed to %s's posts!\n\n", subbed.username );
 	  strcat( buffer, main_msg );
@@ -615,7 +617,7 @@ void handle_subscriptions()
 
 	// Display new status
 	bzero( buffer, 512 );	
-	if( unsubbed.username != NULL )
+	if( strlen(unsubbed.username) != 0 )
 	{
 	  snprintf( buffer, 512, "You have unsubscribed from %s's posts!\n\n", unsubbed.username );
 	  strcat( buffer, main_msg );
@@ -699,10 +701,13 @@ void view_messages( int real_time )
 
 void post_message()
 {
+  // Don't send an empty message
+  if( strlen(buffer) == 0 )
+    return;
+
   // Create message from buffer
-  char message1[256];
-  bzero( message1, 255 );
-  strncpy( buffer, buffer, strlen( buffer ) );
+  char message1[512];
+  bzero( message1, 512 );
   strcat( strcat( strcat( strcat( strcat( message1, "\n[User "), current_user->username), "] - "), buffer ), "\n");
 
 
@@ -723,7 +728,7 @@ void post_message()
       {
 	printf("Sending message to %s\n", users[i].username );
 	message new_message;
-	strncpy( new_message.from, current_user->username, strlen( current_user->username ) );
+	//strncpy( new_message.from, current_user->username, strlen( current_user->username ) );
 	strncpy( new_message.message, message1, strlen( message1 ) );
 
 	if( users[i].online == 0 )
@@ -731,6 +736,7 @@ void post_message()
 	else
 	  new_message.offline = 0;
 
+	bzero( users[i].messages[ users[i].message_count ].message, MAX_TWEET_LENGTH );
 	users[i].messages[ users[i].message_count ] = new_message;
 	++users[i].message_count;
 
@@ -742,7 +748,7 @@ void post_message()
 	if( ht != NULL )
 	{
 	  // Get message up until the hashtag and place into string
-	  char bff[50];
+	  char bff[30];
 	  int i = 0;
 	  char* ptr1 = buffer;
 	  while( *ptr1 != '#' )
@@ -751,11 +757,10 @@ void post_message()
 	    ++ptr1;
 	    ++i;
 	  }
+	  bff[i] = '\0';   // Signal end of string
 
 	  // Place the hashtag name into string
-	  printf("found hashtag!\n");
 	  char ht_name[30];
-
 	  char* ptr2 = ht;
 	  ++ptr2; // Skip the '#'
 	  i = 0;
@@ -769,7 +774,6 @@ void post_message()
 	  }
 	  ht_name[i] = '\0'; // Signal end of string
 
-
 	  // Search to see if hashtag is there already
 	  int found = -1;
 	  for( i = 0; i < current_user->hashtag_count; ++i )
@@ -778,23 +782,30 @@ void post_message()
 	      found = i;
 	  }
 
+
 	  if( found == -1 )
 	  {
+	    int ht_index = current_user->hashtag_count;
+	    
 	    // Not found, create new hashtag
-	    strncpy( current_user->hashtags[ current_user->hashtag_count ].hashtag, ht_name, strlen(bff) );
-	    current_user->hashtags[ current_user->hashtag_count ].count = 0;
+	    strncpy( current_user->hashtags[ ht_index ].hashtag, ht_name, strlen(ht_name) );
+	    current_user->hashtags[ ht_index ].count = 0;
 
 	    // Then add messsage
-	    strncpy( current_user->hashtags[ current_user->hashtag_count ].messages[ current_user->hashtags[ current_user->hashtag_count ].count ], bff, strlen(bff) );
+	    strncpy( current_user->hashtags[ ht_index ].messages[ 0 ], bff, strlen(bff) );
 
-	    ++current_user->hashtags[ current_user->hashtag_count ].count; // Increment message count
+	    ++current_user->hashtags[ ht_index ].count; // Increment message count
 	    ++current_user->hashtag_count; // Increment current user's hashtag count
-
 	  }
 	  else
 	  {
+	    printf("adding to hashtag...\n");
+
 	    // Hashtag found, now add on to it
 	    strncpy( current_user->hashtags[ found ].messages[ current_user->hashtags[ found ].count ], bff, strlen(bff) );
+	    printf("Added message %s to hashtag %s at index %d with message index %d\n", bff, ht_name, found, current_user->hashtags[ found ].count );
+
+
 	    ++current_user->hashtags[ found ].count;
 	  }
 
@@ -856,7 +867,7 @@ void search_hashtags()
   bzero(buffer, 512);
   int i, j, k;
 
-  strcat( buffer, "Found the following hashtags from friends:\n" );
+  printf(" searching for hashtag %s\n", compare );
   for( j = 0; j < MAX_USERS; ++j )
   {
     if( (strncmp( users[j].username, current_user->username, strlen(users[j].username) ) == 0) )
@@ -866,13 +877,15 @@ void search_hashtags()
     {
 
       // If we've found the hashtag, add to buffer to output
-      if( (strncmp( compare, users[j].hashtags[i].hashtag, strlen(compare)) == 0 ) )
+      
+      if( (strncmp( compare, users[j].hashtags[i].hashtag, strlen( users[j].hashtags[i].hashtag )) == 0 ) )
       {
-	for( k = 0; k < users[j].hashtags[i].count; ++k )
-	  {
-	    strcat( strcat( strcat( strcat( strcat( strcat( buffer, users[j].username ), " - " ), users[j].hashtags[i].hashtag ), "\n"), users[j].hashtags[i].messages[k]), "\n");
+	strcat( buffer, "Found the following hashtags from friends:\n" );
+	strcat( strcat( strcat( strcat( buffer, users[j].username ), " - " ), users[j].hashtags[i].hashtag ), "\n");
 
-	  }
+	for( k = 0; k < users[j].hashtags[i].count; ++k )
+	  strcat( strcat( buffer, users[j].hashtags[i].messages[k]), "\n");
+	
       }
       
     }
@@ -895,12 +908,13 @@ void handle_hashtags()
     if( current_menu == 1) 
     {
       // Place all hashtags found in buffer and output
+      bzero( buffer, 512 );
       search_hashtags(); 
 
       n = write( newsockfd, buffer, strlen( buffer ) );
       if( n < 0 )
 	error("error writing to socket");
-
+      
       get_menu_input();
     }
   }

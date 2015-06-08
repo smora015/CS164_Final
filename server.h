@@ -9,13 +9,12 @@
 
 // Declare structs
 typedef struct messages_struct {
-  char from[MAX_LENGTH];
   int offline;
   char message[MAX_TWEET_LENGTH];
 } message;
 
 typedef struct hashtag_struct {
-  char* hashtag;
+  char hashtag[30];
   char messages[MAX_MESSAGES][30];
   int count;
 } hashtag;
